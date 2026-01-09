@@ -13,6 +13,24 @@ This README documents everything I have learned and implemented so far about **N
   * **V8 JavaScript Engine** (written mainly in C++)
   * **libuv** (handles async operations)
 
+┌─────────────────────┐
+│ Node.js Runtime │
+│ ┌─────────────────┐ │
+│ │ V8 Engine │ │
+│ └─────────────────┘ │
+│ ┌─────────────────┐ │
+│ │ libuv │ │
+│ └─────────────────┘ │
+└─────────────────────┘
+│
+▼
+┌─────────────────────┐
+│ Operating System │
+│ (Linux/Mac/Windows) │
+└─────────────────────┘
+
+text
+
 > We write JavaScript, but internally Node.js uses C++ to talk to the OS.
 
 ---
@@ -34,6 +52,16 @@ This README documents everything I have learned and implemented so far about **N
   * `http`
   * `global`
 
+┌─────────────────────────────┐
+│ V8 Engine │
+│ ┌─────────────┐ ┌─────────┐ │
+│ │ Call Stack │ │ Heap │ │
+│ └─────────────┘ └─────────┘ │
+│ Executes JS │
+└─────────────────────────────┘
+
+text
+
 ### Node.js Runtime
 
 * Sits **around V8**
@@ -44,6 +72,21 @@ This README documents everything I have learned and implemented so far about **N
   * Network
   * Timers
   * OS features
+
+text
+     ┌─────────────────────┐
+     │    Node.js         │
+     │   (C++ Wrapper)    │
+     │ ┌─────────────────┐│
+     │ │     V8          ││
+     │ └─────────────────┘│
+     └─────────────────────┘
+            │
+            ▼
+ ┌─────────────────┐
+ │   libuv + OS    │
+ └─────────────────┘
+text
 
 ---
 
@@ -58,11 +101,34 @@ This README documents everything I have learned and implemented so far about **N
   * `self`
   * `frames`
 
+Browser Global Names:
+┌─────────────┐
+│ window │ ← Same object, different names
+│ │ │
+│ this │
+│ │ │
+│ self │
+│ │ │
+│ frames │
+└─────────────┘
+
+text
+
 ### In Node.js
 
 * Global object:
 
   * `global`
+
+Node.js Global:
+┌─────────────┐
+│ global │ ← Node.js provides this
+└─────────────┘
+│
+▼
+V8 Engine ← Injected by Node.js
+
+text
 
 Important points:
 
@@ -77,188 +143,277 @@ Important points:
 
 ```js
 globalThis
-```
+Works in:
 
-* Works in:
+Browser
 
-  * Browser
-  * Node.js
-  * Web workers
+Node.js
 
----
+Web workers
 
-## 4. Node.js Core Modules
-
+text
+globalThis = Universal Global Access
+┌─────────────┐ ┌─────────────┐
+│ Browser     │ │   Node.js   │
+│ window      │ │  global     │
+│   ↓         │ │    ↓        │
+└─────┬───────┘ └─────┬───────┘
+      │                │
+      └─────── globalThis ───────┘
+4. Node.js Core Modules
 Node.js provides built-in modules (no installation needed).
-They are written in **C++ + JavaScript**.
+They are written in C++ + JavaScript.
 
-### Importing Core Modules
-
-```js
+Importing Core Modules
+js
 const fs = require("node:fs");
 const crypto = require("node:crypto");
-```
+text
+Core Modules Flow:
+┌─────────────┐
+│  require()  │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ C++ Bindings│ ← fs, http, crypto
+│  + JS APIs  │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│    libuv    │
+└─────────────┘
+5. Important Core Modules (Short Notes)
+fs (File System)
+Read/write files
 
----
+Sync and async APIs
 
-## 5. Important Core Modules (Short Notes)
+js
+fs.readFileSync("file.txt", "utf8");     // ❌ Blocks
+fs.readFile("file.txt", "utf8", cb);     // ✅ Non-blocking
+text
+fs.readFile() Flow:
+┌─────────────┐
+│   JS Code   │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ Node.js fs  │
+│   Binding   │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│   libuv     │ ← Thread Pool
+│ Thread Pool │
+└─────────────┘
+       │
+       ▼
+┌─────────────┐
+│ Callback    │
+└─────────────┘
+crypto
+Encryption, hashing, random values
 
-### fs (File System)
+Used for:
 
-* Read/write files
-* Sync and async APIs
+Password hashing
 
-```js
-fs.readFileSync("file.txt", "utf8");
-fs.readFile("file.txt", "utf8", cb);
-```
+Tokens
 
----
+Async crypto operations are handled by libuv
 
-### crypto
+zlib
+Used for compression & decompression
 
-* Encryption, hashing, random values
-* Used for:
+Examples:
 
-  * Password hashing
-  * Tokens
-* **Async crypto operations are handled by libuv**
+gzip
 
----
+deflate
 
-### zlib
+Used internally for:
 
-* Used for **compression & decompression**
-* Examples:
+HTTP compression
 
-  * gzip
-  * deflate
-* Used internally for:
+console
+Logging & debugging
 
-  * HTTP compression
+console.log is not pure JS
 
----
+It talks to stdout via Node.js internals
 
-### console
+text
+console.log() Flow:
+┌─────────────┐
+│ console.log │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ Node.js C++ │
+│   Binding   │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│    stdout   │
+└─────────────┘
+https / http
+Used for network requests
 
-* Logging & debugging
-* `console.log` is **not pure JS**
-* It talks to **stdout** via Node.js internals
+Uses libuv for non-blocking I/O
 
----
+js
+https.get(url, cb);  // libuv handles connection
+6. Module System in Node.js (require)
+Steps when we use require()
+text
+1. RESOLVE    2. LOAD     3. WRAP        4. EVALUATE    5. CACHE
+./path    →  file    → IIFE     → execute   → module.exports
+Resolving the module
 
-### https / http
+./local/path
 
-* Used for network requests
-* Uses libuv for non-blocking I/O
+.json
 
-```js
-https.get(url, cb);
-```
+node:module
 
----
+Loading the module
 
-## 6. Module System in Node.js (require)
+File content loaded based on file type
 
-### Steps when we use `require()`
+Wrapping inside IIFE
 
-1. **Resolving the module**
-
-   * `./local/path`
-   * `.json`
-   * `node:module`
-
-2. **Loading the module**
-
-   * File content loaded based on file type
-
-3. **Wrapping inside IIFE**
-
-```js
+js
 (function (exports, require, module, __filename, __dirname) {
   // module code
 })();
-```
+Evaluation
 
-4. **Evaluation**
+Code is executed
 
-   * Code is executed
-   * `module.exports` is returned
+module.exports is returned
 
-5. **Caching**
+Caching
 
-   * Module is cached
-   * Next `require()` returns cached version
+Module is cached
 
----
+Next require() returns cached version
 
-## 7. Synchronous vs Asynchronous Code
+text
+Module Cache:
+┌─────────────────┐
+│ require("fs")   │ ──→ cached ──→ 1st time
+└─────────┬───────┘              loaded
+          │
+          ▼
+┌─────────────────┐
+│   Module Cache  │ ← Subsequent requires FAST
+│   fs: {...}     │
+└─────────────────┘
+7. Synchronous vs Asynchronous Code
+Synchronous Code
+Blocks the call stack
 
-### Synchronous Code
+JS waits till execution finishes
 
-* Blocks the call stack
-* JS waits till execution finishes
-
-```js
+js
 fs.readFileSync("./file.txt", "utf8");
-console.log("This runs after file read");
-```
+console.log("This runs after file read");  // ❌ BLOCKED
+text
+Sync Execution:
+┌─────────────┐
+│ Call Stack  │
+│ [main]      │
+│ [readFile]  │ ← BLOCKS everything
+│ [log]       │
+└─────────────┘
+Even though Node uses libuv internally, sync code blocks JS execution.
 
-Even though Node uses libuv internally, **sync code blocks JS execution**.
+Asynchronous Code
+Offloaded to libuv
 
----
+Non-blocking
 
-### Asynchronous Code
-
-* Offloaded to **libuv**
-* Non-blocking
-
-```js
+js
 fs.readFile("./file.txt", "utf8", (err, data) => {
-  console.log(data);
+  console.log(data);  // ✅ Runs later
 });
-```
-
----
-
-## 8. libuv (Very Important)
-
+console.log("This runs immediately");  // ✅ Runs first
+text
+Async Execution:
+┌─────────────┐     ┌─────────────┐
+│ Call Stack  │     │ Callback    │
+│ [main]      │◀───▶│   Queue     │
+│ [readFile]  │     └─────────────┘
+└─────────────┘           │
+                          ▼
+                   ┌─────────────┐
+                   │    libuv    │
+                   └─────────────┘
+8. libuv (Very Important)
 libuv handles:
 
-* File system (async)
-* Network I/O
-* Timers (`setTimeout`)
-* Crypto operations
-* Thread pool
+File system (async)
 
-> libuv works in the background and pushes callbacks when ready.
+Network I/O
 
----
+Timers (setTimeout)
 
-## 9. setTimeout & Event Loop Behavior
+Crypto operations
 
-```js
+Thread pool
+
+text
+libuv Responsibilities:
+┌─────────────────────────────────────┐
+│              libuv                  │
+├─────────────┬───────────────────────┤
+│ File I/O    │     Network          │ ← Thread Pool
+│ Crypto      │     DNS              │
+├─────────────┼───────────────────────┤
+│   Timers    │    Event Loop        │
+│setTimeout() │   Callbacks          │
+└─────────────┴───────────────────────┘
+libuv works in the background and pushes callbacks when ready.
+
+9. setTimeout & Event Loop Behavior
+js
 setTimeout(() => {
   console.log("call me right now");
 }, 0);
-```
-
 Key points:
 
-* `0` does NOT mean immediate execution
-* Callback is sent to **libuv timers queue**
-* Runs only when:
+0 does NOT mean immediate execution
 
-  * Call stack is empty
-  * Event loop allows it
+Callback is sent to libuv timers queue
 
-This is why setTimeout has **trust issues** 😄
+Runs only when:
 
----
+Call stack is empty
 
-## 10. Execution Flow Example
+Event loop allows it
 
-```js
+text
+setTimeout(..., 0) Flow:
+┌─────────────┐
+│ JS Thread   │
+│setTimeout() │ ──→ Timers Queue ──→ libuv
+└──────┬──────┘
+       │ Call Stack Empty?
+       ▼
+┌─────────────┐
+│ Event Loop  │ ──→ Executes callback
+│  Timers     │
+└─────────────┘
+This is why setTimeout has trust issues 😄
+
+10. Execution Flow Example
+js
 console.log("Hello World");
 
 setTimeout(() => {
@@ -270,30 +425,51 @@ function multiplyFn(x, y) {
 }
 
 console.log("Result:", multiplyFn(10, 20));
-```
+Step-by-step Execution Diagram
+text
+Step 1:        Step 2:        Step 3:        Step 4:
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│ Call Stack  │ │ Call Stack  │ │ Call Stack  │ │ Call Stack  │
+│ [main]      │ │ [main]      │ │ [main]      │ │ [empty]     │
+└─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
+        │              │              │              │
+        ▼              ▼              ▼              ▼
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│ console.log │ │ setTimeout  │ │ multiplyFn  │ │ Event Loop  │
+│ Hello World │ │ → libuv     │ │ → 200       │ │ → callback  │
+└─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
 
-### Step-by-step
+Output:
+1. "Hello World"
+2. "Result: 200" 
+3. "call me right now"
+11. Key Takeaways
+text
+Node.js Architecture Summary:
+┌─────────────────────────────┐
+│           Node.js            │
+│ ┌─────────────┐ ┌─────────┐ │
+│ │     V8      │ │ libuv   │ │
+│ │ -  Call Stack│ │ -  Event │ │
+│ │ -  Heap      │ │ Loop    │ │
+│ │ -  GC        │ │ -  Thread│ │
+│ └─────────────┘ └───────Pool│ │
+└─────────────────────────────┘
+Node.js ≠ Browser JavaScript
 
-1. `console.log` → Call stack
-2. `setTimeout` → sent to libuv
-3. `multiplyFn` → executed synchronously
-4. Call stack becomes empty
-5. Event loop pushes timer callback
-6. `setTimeout` callback executes
+V8 runs JS, Node provides power
 
----
+libuv is the backbone of async
 
-## 11. Key Takeaways
+Sync code blocks execution
 
-* Node.js ≠ Browser JavaScript
-* V8 runs JS, Node provides power
-* libuv is the backbone of async
-* Sync code blocks execution
-* Async code waits for call stack to clear
-* `global` is Node-specific
-* `globalThis` is universal
+Async code waits for call stack to clear
 
-# JavaScript Execution Inside Node.js – Big Picture
+global is Node-specific
+
+globalThis is universal
+
+# 12 JavaScript Execution Inside Node.js – Big Picture
 
 When JavaScript runs in **Node.js**, three major systems work together:
 

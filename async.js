@@ -14,7 +14,7 @@ console.log("This will execute only after file read");
 https.get("https://dummyjson.com/products/1", (res) => {
   console.log("Fetched Data Successfully");
 });
-
+ 
 setTimeout(() => {
   console.log("setTimeout called after 5 seconds");
 }, 5000);
